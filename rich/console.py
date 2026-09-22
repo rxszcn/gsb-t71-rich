@@ -388,8 +388,9 @@ class PagerContext:
     ) -> None:
         if exc_type is None:
             with self._console._lock:
-                buffer: List[Segment] = self._console._buffer[:]
-                del self._console._buffer[:]
+                offset = self._console._thread_locals.buffer_stack[-1]
+                buffer: List[Segment] = self._console._buffer[offset:]
+                del self._console._buffer[offset:]
                 segments: Iterable[Segment] = buffer
                 if not self.styles:
                     segments = Segment.strip_styles(segments)
@@ -539,6 +540,7 @@ class ConsoleThreadLocals(threading.local):
     theme_stack: ThemeStack
     buffer: List[Segment] = field(default_factory=list)
     buffer_index: int = 0
+    buffer_stack: List[int] = field(default_factory=list)
 
 
 class RenderHook(ABC):
@@ -812,10 +814,12 @@ class Console:
 
     def _enter_buffer(self) -> None:
         """Enter in to a buffer context, and buffer all output."""
+        self._thread_locals.buffer_stack.append(len(self._buffer))
         self._buffer_index += 1
 
     def _exit_buffer(self) -> None:
         """Leave buffer context, and render content if required."""
+        self._thread_locals.buffer_stack.pop()
         self._buffer_index -= 1
         self._check_buffer()
 
@@ -873,8 +877,9 @@ class Console:
         Returns:
             str: Console output.
         """
-        render_result = self._render_buffer(self._buffer)
-        del self._buffer[:]
+        offset = self._thread_locals.buffer_stack[-1]
+        render_result = self._render_buffer(self._buffer[offset:])
+        del self._buffer[offset:]
         self._exit_buffer()
         return render_result
 
