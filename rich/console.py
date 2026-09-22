@@ -539,6 +539,7 @@ class ConsoleThreadLocals(threading.local):
     theme_stack: ThemeStack
     buffer: List[Segment] = field(default_factory=list)
     buffer_index: int = 0
+    capture_marks: List[int] = field(default_factory=list)
 
 
 class RenderHook(ABC):
@@ -866,15 +867,23 @@ class Console:
     def begin_capture(self) -> None:
         """Begin capturing console output. Call :meth:`end_capture` to exit capture mode and return output."""
         self._enter_buffer()
+        self._thread_locals.capture_marks.append(len(self._buffer))
 
     def end_capture(self) -> str:
         """End capture mode and return captured string.
 
+        Captures may be nested; each capture returns only the output printed
+        between its own :meth:`begin_capture` and :meth:`end_capture`, and
+        leaves output captured by any enclosing capture intact.
+
         Returns:
             str: Console output.
         """
-        render_result = self._render_buffer(self._buffer)
-        del self._buffer[:]
+        buffer = self._buffer
+        capture_marks = self._thread_locals.capture_marks
+        mark = capture_marks.pop() if capture_marks else 0
+        render_result = self._render_buffer(buffer[mark:])
+        del buffer[mark:]
         self._exit_buffer()
         return render_result
 

@@ -389,6 +389,30 @@ def test_capture() -> None:
     assert capture.get() == "Hello\n"
 
 
+def test_nested_capture() -> None:
+    console = Console()
+    with console.capture() as outer:
+        console.print("A")
+        with console.capture() as inner:
+            console.print("B")
+        console.print("C")
+    assert inner.get() == "B\n"
+    assert outer.get() == "A\nC\n"
+
+
+def test_nested_begin_end_capture() -> None:
+    console = Console()
+    console.begin_capture()
+    console.print("1")
+    console.begin_capture()
+    console.print("2")
+    console.begin_capture()
+    console.print("3")
+    assert console.end_capture() == "3\n"
+    assert console.end_capture() == "2\n"
+    assert console.end_capture() == "1\n"
+
+
 def test_input(monkeypatch, capsys) -> None:
     def fake_input(prompt=""):
         console.file.write(prompt)
